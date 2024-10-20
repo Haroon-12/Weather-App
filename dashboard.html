@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="hamburger" id="hamburgerMenu">
+        &#9776; 
+    </div>
+    <div class="sidebar">
+        <div class="logo">Weather</div>
+        <nav>
+            <a href="dashboard.html" id="dashboardLink">Dashboard</a>
+            <a href="tables.html" id="tablesLink">Tables</a>
+        </nav>
+    </div>
+
+    <div class="main-content" id="main-content">
+        <div class="can">
+            <div class="profile-circle">
+                <img src="Images/profile2.png" alt="Profile" />
+            </div>
+
+            <h1>Dashboard</h1>
+            <div class="search-section">
+                <input type="text" id="city" placeholder="Enter city name">
+                <button id="getWeatherBtn">Get Weather</button>
+            </div>
+            <div class="optional">
+                <label>
+                    <input type="checkbox" id="unitToggle"> Show in Fahrenheit
+                </label>
+            </div>
+        </div>
+
+        <div id="weather-widget" class="widget"></div>
+
+        <div class="chart-container">
+            <div class="chart-row">
+                <canvas id="barChart"></canvas>
+                <canvas id="doughnutChart"></canvas>
+                <canvas id="lineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const unitToggle = document.getElementById('unitToggle');
+        let units = 'metric';
+
+        unitToggle.addEventListener('change', () => {
+            units = unitToggle.checked ? 'imperial' : 'metric';
+        });
+
+        document.getElementById('getWeatherBtn').addEventListener('click', () => {
+            const city = document.getElementById('city').value;
+            const apiKey = '82e16c9b935bd9875cf32e0851c4e8d6'; // OpenWeather API key
+
+            fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${apiKey}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        const lat = data[0].lat;
+                        const lon = data[0].lon;
+
+                        // Fetch current weather
+                        fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${apiKey}`)
+                            .then(response => response.json())
+                            .then(weatherData => {
+                                const tempUnit = units === 'metric' ? '°C' : '°F';
+                                const weatherCondition = weatherData.weather[0].main.toLowerCase();
+
+                                const weatherWidget = document.getElementById('weather-widget');
+
+                                console.log("Weather condition:", weatherCondition);
+
+                                if (weatherCondition.includes('clear')) {
+                                    weatherWidget.style.backgroundImage = "url('Images/clear.jpg')";
+                                } else if (weatherCondition.includes('clouds')) {
+                                    weatherWidget.style.backgroundImage = "url('Images/clouds.jpg')";
+                                } else if (weatherCondition.includes('rain')) {
+                                    weatherWidget.style.backgroundImage = "url('Images/rain.jpeg.jpg')";
+                                } else if (weatherCondition.includes('snow')) {
+                                    weatherWidget.style.backgroundImage = "url('Images/snow.jpeg.jpg')";
+                                } else if (weatherCondition.includes('thunder')) {
+                                    weatherWidget.style.backgroundImage = "url('Images/thunder.jpeg.jpg')";
+                                }
+                                else {
+                                    weatherWidget.style.backgroundColor = '#FFFFFF'; 
+                                }
+
+                                weatherWidget.innerHTML = `  
+                            <h2>Current Weather in ${weatherData.name}</h2>
+                            <p>Temperature: ${weatherData.main.temp} ${tempUnit}</p>
+                            <p>Weather: ${weatherData.weather[0].description}</p>
+                            <p>Humidity: ${weatherData.main.humidity}%</p>
+                            <p>Wind Speed: ${weatherData.wind.speed} m/s</p>
+                        `;
+
+                                // Clear existing charts
+                                clearCharts();
+
+                                // Fetch 5-day forecast 
+                                fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&appid=${apiKey}`)
+                                    .then(response => response.json())
+                                    .then(forecastData => {
+                                        const forecastList = forecastData.list.slice(0, 5);  // Taking data for 5 days
+                                        // Prepare data for charts
+                                        const dates = forecastList.map(item => new Date(item.dt_txt).toLocaleDateString());
+                                        const temps = forecastList.map(item => item.main.temp);
+
+                                        // Create charts
+                                        createCharts(dates, temps);
+                                    });
+                            });
+                    } else {
+                        alert("City not found. Please try again.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching coordinates:", error);
+                });
+        });
+
+        // Function to create charts
+        function createCharts(dates, temps) {
+            // Ensure the charts are cleared before rendering new ones
+            clearCharts();
+
+            // Bar Chart
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: temps,
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutBounce'
+                    }
+                }
+            });
+
+            // Doughnut Chart
+            const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
+            new Chart(doughnutCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Sunny', 'Cloudy', 'Rainy', 'Snowy'],
+                    datasets: [{
+                        label: 'Weather Conditions',
+                        data: [50, 30, 15, 5],  
+                        backgroundColor: ['yellow', 'gray', 'blue', 'aliceblue']
+                    }]
+                },
+                options: {
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeInOutQuart'
+                    }
+                }
+            });
+
+            // Line Chart
+            const lineCtx = document.getElementById('lineChart').getContext('2d');
+            new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: temps,
+                        fill: false,
+                        borderColor: 'red',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeInOutCubic'
+                    }
+                }
+            });
+        }
+
+        // Function to clear existing charts
+        function clearCharts() {
+            const barChart = document.getElementById('barChart');
+            const doughnutChart = document.getElementById('doughnutChart');
+            const lineChart = document.getElementById('lineChart');
+
+            // Clear the canvas for each chart
+            barChart.innerHTML = '';
+            doughnutChart.innerHTML = '';
+            lineChart.innerHTML = '';
+        }
+
+
+        // JavaScript to toggle sidebar visibility
+        document.getElementById('hamburgerMenu').addEventListener('click', () => {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('active');
+        });
+
+    </script>
+</body>
+
+</html>
